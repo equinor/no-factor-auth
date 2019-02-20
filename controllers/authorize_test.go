@@ -1,11 +1,12 @@
-package main
-
+package controllers
 import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/equinor/no-factor-auth/config"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/labstack/echo/v4"
@@ -18,7 +19,7 @@ func TestAuthorized(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	c := e.NewContext(req, rec)
-	if !assert.NoError(t, authorize(c)) {
+	if !assert.NoError(t, Authorize(c)) {
 		return
 	}
 
@@ -47,7 +48,7 @@ func TestAuthorized(t *testing.T) {
 		return
 	}
 
-	p := getPubkey()
+	p := config.PublicKey()
 	t.Run("Check token", checktoken(accessToken, p))
 
 }
