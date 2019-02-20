@@ -14,16 +14,31 @@ import (
 
 func TestOidc(t *testing.T) {
 	e := echo.New()
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, StdOidcConfigURI, nil)
 	rec := httptest.NewRecorder()
-	authServer := "http://some.host:6666"
+	authServer := "http://example.com"
 	// tenantID := "common"
 	c := e.NewContext(req, rec)
 	var oidc oidc.OpenIDConfig
 	if assert.NoError(t, OidcConfig(c)) {
 		assert.Equal(t, http.StatusOK, rec.Code)
 		json.Unmarshal(rec.Body.Bytes(), &oidc)
-		assert.Equal(t, oidc.JwksURI, authServer+"/discovery/keys")
+		assert.Equal(t, authServer+"/discovery/keys", oidc.JwksURI)
+	}
+}
+func TestOidcTenant(t *testing.T) {
+	e := echo.New()
+	tenant := "/tenant"
+	req := httptest.NewRequest(http.MethodGet, tenant+StdOidcConfigURI, nil)
+	rec := httptest.NewRecorder()
+	authServer := "http://example.com" + tenant
+	// tenantID := "common"
+	c := e.NewContext(req, rec)
+	var oidc oidc.OpenIDConfig
+	if assert.NoError(t, OidcConfig(c)) {
+		assert.Equal(t, http.StatusOK, rec.Code)
+		json.Unmarshal(rec.Body.Bytes(), &oidc)
+		assert.Equal(t, authServer+"/discovery/keys", oidc.JwksURI)
 	}
 }
 
