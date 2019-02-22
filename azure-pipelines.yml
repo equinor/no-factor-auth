@@ -17,7 +17,7 @@ variables:
 steps:
 - script: docker build -f Dockerfile -t $(imageName) .
   displayName: 'docker build'
-- script: echo $(DOCKER_PWD) | docker login -u $(DOCKER_USER) --pasword-stdin  
+- script: docker login -u $(DOCKER_USER) -p $(DOCKER_PWD)
   displayName: 'docker login'
 - script: docker push $(imageName) 
   displayName: 'docker push'
