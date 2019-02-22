@@ -11,6 +11,7 @@ pool:
 
 variables:
   imageName: 'heappurple/no-factor-auth:$(build.buildId)'
+- group: buildsecrets
 
 steps:
 - script: docker build -f Dockerfile -t $(imageName) .
