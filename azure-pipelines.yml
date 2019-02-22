@@ -11,6 +11,8 @@ pool:
 
 variables:
   imageName: 'heappurple/no-factor-auth:$(build.buildId)'
+
+variables:
 - group: buildsecrets
 
 steps:
