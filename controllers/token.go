@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 )
@@ -51,7 +52,23 @@ func Token(c echo.Context) error {
 	if clientSecret == "" {
 		return c.JSON(http.StatusBadRequest, TokenErrorResponse{Error: "No client_secret"})
 	}
-	a, err := newToken("anon1", c.Request().Host, clientID, "Foo", "Jane Doe")
+
+	oid := c.QueryParam("oid")
+	if oid == "" {
+		return c.JSON(http.StatusBadRequest, TokenErrorResponse{Error: "No oid"})
+	}
+
+	addClaims := c.QueryParam("add_claims_array")
+
+	var claimsPair pair
+
+	if addClaims != "" {
+		parsed := strings.SplitN(addClaims, "=", 2)
+		claimsPair.key = parsed[0]
+		claimsPair.values = strings.Split(parsed[1], ",")
+	}
+
+	a, err := newTokenWithClaims("anon1", c.Request().Host, clientID, "Foo", "Jane Doe", oid, claimsPair)
 	if err != nil {
 		return err
 	}

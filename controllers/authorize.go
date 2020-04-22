@@ -12,8 +12,13 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func newToken(sub, iss, aud, nonce, name string) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
+type pair struct{
+	key string
+	values []string
+}
+
+func newTokenWithClaims(sub, iss, aud, nonce, name string, oid string, claim pair) (string, error) {
+	defaultClaims := jwt.MapClaims{
 		"sub":       sub,
 		"nbf":       time.Now().Unix(),
 		"iss":       iss,
@@ -24,7 +29,14 @@ func newToken(sub, iss, aud, nonce, name string) (string, error) {
 		"iat":       time.Now().Unix(),
 		"exp":       time.Now().Add(1 * time.Hour).Unix(),
 		"name":      name,
-	})
+		"oid":		 oid,
+	}
+
+	if claim.key != "" {
+		defaultClaims[claim.key] = claim.values
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, defaultClaims)
 
 	token.Header = map[string]interface{}{
 		"typ": "JWT",
@@ -39,6 +51,11 @@ func newToken(sub, iss, aud, nonce, name string) (string, error) {
 		return "", err
 	}
 	return tokenString, nil
+}
+
+func newToken(sub, iss, aud, nonce, name string, oid string) (string, error){
+	var p pair
+	return newTokenWithClaims(sub, iss, aud, nonce, name, oid, p)
 }
 
 // Authorize provides id_token and access_token to anyone who asks
@@ -62,7 +79,7 @@ func Authorize(c echo.Context) error {
 
 	// Sign and get the complete encoded token as a string using the secret
 
-	tokenString, err := newToken(sub, c.Request().Host, clientID, c.QueryParam("nonce"), user)
+	tokenString, err := newToken(sub, c.Request().Host, clientID, c.QueryParam("nonce"), user, "oid")
 	if err != nil {
 		return err
 	}
