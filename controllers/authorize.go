@@ -17,7 +17,7 @@ type pair struct{
 	values []string
 }
 
-func newTokenWithClaims(sub, iss, aud, nonce, name string, oid string, claim pair) (string, error) {
+func newTokenWithClaims(sub, iss, aud, nonce, name string, claims map[string]interface{}) (string, error) {
 	defaultClaims := jwt.MapClaims{
 		"sub":       sub,
 		"nbf":       time.Now().Unix(),
@@ -29,11 +29,10 @@ func newTokenWithClaims(sub, iss, aud, nonce, name string, oid string, claim pai
 		"iat":       time.Now().Unix(),
 		"exp":       time.Now().Add(1 * time.Hour).Unix(),
 		"name":      name,
-		"oid":		 oid,
 	}
 
-	if claim.key != "" {
-		defaultClaims[claim.key] = claim.values
+	for key, value := range claims {
+		defaultClaims[key] = value
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, defaultClaims)
@@ -53,9 +52,9 @@ func newTokenWithClaims(sub, iss, aud, nonce, name string, oid string, claim pai
 	return tokenString, nil
 }
 
-func newToken(sub, iss, aud, nonce, name string, oid string) (string, error){
-	var p pair
-	return newTokenWithClaims(sub, iss, aud, nonce, name, oid, p)
+func newToken(sub, iss, aud, nonce, name string) (string, error){
+	var extraClaims map[string]interface{}
+	return newTokenWithClaims(sub, iss, aud, nonce, name, extraClaims)
 }
 
 // Authorize provides id_token and access_token to anyone who asks
@@ -79,7 +78,7 @@ func Authorize(c echo.Context) error {
 
 	// Sign and get the complete encoded token as a string using the secret
 
-	tokenString, err := newToken(sub, c.Request().Host, clientID, c.QueryParam("nonce"), user, "oid")
+	tokenString, err := newToken(sub, c.Request().Host, clientID, c.QueryParam("nonce"), user)
 	if err != nil {
 		return err
 	}

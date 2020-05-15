@@ -1,10 +1,10 @@
 package controllers
 
 import (
-	"net/http"
-	"strings"
-
+	"encoding/json"
+	"fmt"
 	"github.com/labstack/echo/v4"
+	"net/http"
 )
 
 // TokenOKResponse ok type
@@ -53,25 +53,36 @@ func Token(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, TokenErrorResponse{Error: "No client_secret"})
 	}
 
-	oid := c.QueryParam("oid")
-	if oid == "" {
-		return c.JSON(http.StatusBadRequest, TokenErrorResponse{Error: "No oid"})
+	extraClaimsBytes := []byte(c.QueryParam("extra_claims"))
+	var extraClaims map[string]interface{}
+	var err error
+	if len(extraClaimsBytes) > 0 {
+		extraClaims, err = ParseExtraClaims(extraClaimsBytes)
+		if err != nil{
+			return c.JSON(http.StatusBadRequest,
+				TokenErrorResponse{Error: fmt.Sprintf("Unable to parse extra_claims: %s",err.Error())})
+		}
 	}
 
-	addClaims := c.QueryParam("add_claims_array")
-
-	var claimsPair pair
-
-	if addClaims != "" {
-		parsed := strings.SplitN(addClaims, "=", 2)
-		claimsPair.key = parsed[0]
-		claimsPair.values = strings.Split(parsed[1], ",")
-	}
-
-	a, err := newTokenWithClaims("anon1", c.Request().Host, clientID, "Foo", "Jane Doe", oid, claimsPair)
+	a, err := newTokenWithClaims("anon1", c.Request().Host, clientID, "Foo", "Jane Doe", extraClaims)
 	if err != nil {
 		return err
 	}
 
 	return c.JSON(http.StatusOK, TokenOKResponse{AccessToken: a, IDToken: a, TokenType: "Bearer"})
+}
+
+func ParseExtraClaims(addClaims []byte)(map[string]interface{}, error){
+	var f interface{}
+	var res map[string]interface{}
+	var err error
+
+	if addClaims != nil{
+		err = json.Unmarshal(addClaims, &f)
+	}
+	if f != nil{
+		res = f.(map[string]interface{})
+	}
+
+	return res, err
 }
