@@ -1,4 +1,4 @@
-package config
+package controllers
 
 import (
 	"crypto/rsa"
@@ -26,27 +26,16 @@ E6oTM2EeUPSyyrj5IdsU2JCNBH1m3JnUflz8p8/NYCoOZg==
 
 const hmacSecret = `SECRET_2gtzk`
 
-type Config struct {
-	HostAddr string
-	TenantID string
-	CertFile string
-}
-
-func Load() *Config {
-
-	return &Config{}
-}
-
-func PrivateKey() *rsa.PrivateKey {
+func privateKey() *rsa.PrivateKey {
 
 	p, _ := jwt.ParseRSAPrivateKeyFromPEM([]byte(privKey))
 	return p
 }
 
-func PublicKey() *rsa.PublicKey {
-	return &PrivateKey().PublicKey
+func publicKey() *rsa.PublicKey {
+	return &privateKey().PublicKey
 }
 
-func HMACKey() []byte {
+func hmacKey() []byte {
 	return []byte(hmacSecret)
 }

@@ -1,22 +1,19 @@
 package controllers
 
 import (
-	"encoding/json"
-	"fmt"
-	"github.com/labstack/echo/v4"
+	"log"
 	"net/http"
+
+	"github.com/labstack/echo/v4"
 )
 
 // TokenOKResponse ok type
 type TokenOKResponse struct {
-	AccessToken  string `json:"access_token"`
 	TokenType    string `json:"token_type"`
-	ExpiresIn    string `json:"expires_in"`
-	ExpiresOn    string `json:"expires_on"`
-	Resource     string `json:"resource"`
-	RefreshToken string `json:"refresh_token"`
 	Scope        string `json:"scope"`
-	IDToken      string `json:"id_token"`
+	ExpiresIn    string `json:"expires_in"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 // TokenErrorResponse error type
@@ -29,60 +26,40 @@ type TokenErrorResponse struct {
 	CorrelationID    string `json:"correlation_id"`
 }
 
-// Token provides id_token and access_token to anyone who asks
-func Token(c echo.Context) error {
-	redirectURI := c.QueryParam("redirect_uri")
-	if redirectURI == "" {
-		return c.JSON(http.StatusBadRequest, TokenErrorResponse{Error: "No redirect_uri"})
-
-	}
-	clientID := c.QueryParam("client_id")
-	if clientID == "" {
-		return c.JSON(http.StatusBadRequest, TokenErrorResponse{Error: "No client_id"})
-	}
-	grantType := c.QueryParam("grant_type")
-	if grantType == "" {
-		return c.JSON(http.StatusBadRequest, TokenErrorResponse{Error: "No grant_type"})
-	}
-	code := c.QueryParam("code")
-	if code == "" {
-		return c.JSON(http.StatusBadRequest, TokenErrorResponse{Error: "No code"})
-	}
-	clientSecret := c.QueryParam("client_secret")
-	if clientSecret == "" {
-		return c.JSON(http.StatusBadRequest, TokenErrorResponse{Error: "No client_secret"})
-	}
-
-	extraClaimsBytes := []byte(c.QueryParam("extra_claims"))
-	var extraClaims map[string]interface{}
-	var err error
-	if len(extraClaimsBytes) > 0 {
-		extraClaims, err = ParseExtraClaims(extraClaimsBytes)
-		if err != nil{
-			return c.JSON(http.StatusBadRequest,
-				TokenErrorResponse{Error: fmt.Sprintf("Unable to parse extra_claims: %s",err.Error())})
-		}
-	}
-
-	a, err := newTokenWithClaims("anon1", c.Request().Host, clientID, "Foo", "Jane Doe", extraClaims)
-	if err != nil {
-		return err
-	}
-
-	return c.JSON(http.StatusOK, TokenOKResponse{AccessToken: a, IDToken: a, TokenType: "Bearer"})
+type reqParams struct {
+	GrantType    string `json:"grant_type" form:"grant_type" query:"grant_type"`
+	ClientID     string `json:"client_id" form:"client_id" query:"client_id"`
+	ClientSecret string `json:"client_secret" form:"client_secret"`
+	ExtraClaims  string `json:"extra_claims" form:"extra_claims"`
+	Assertion    string `json:"assertion" form:"assertion" query:"assertion"`
 }
 
-func ParseExtraClaims(addClaims []byte)(map[string]interface{}, error){
-	var f interface{}
-	var res map[string]interface{}
-	var err error
+// Token provides id_token and access_token to anyone who asks
+func Token(claimsCustom map[string]interface{}) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		log.Printf("claims: %v", claimsCustom)
+		p := new(reqParams)
+		err := c.Bind(p)
+		if err != nil {
+			log.Fatalf("binding: %v", err)
+			return err
+		}
+		log.Printf("p: %+v", p)
 
-	if addClaims != nil{
-		err = json.Unmarshal(addClaims, &f)
-	}
-	if f != nil{
-		res = f.(map[string]interface{})
-	}
+		claims := make(map[string]interface{})
+		claims["iss"] = AuthServer + "/v2.0"
+		claims["sub"] = "sub"
 
-	return res, err
+		for key, val := range claimsCustom {
+			claims[key] = val
+		}
+
+		a, err := newToken(claims)
+		if err != nil {
+			return err
+		}
+		log.Printf("token: %v", a)
+
+		return c.JSON(http.StatusOK, TokenOKResponse{AccessToken: a})
+	}
 }

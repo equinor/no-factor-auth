@@ -2,25 +2,23 @@ package controllers
 
 import (
 	"net/http"
-	"strings"
-
-	"github.com/equinor/no-factor-auth/oidc"
 
 	"github.com/labstack/echo/v4"
 )
 
-// StdOidcConfigURI is the standard andpoint for oidc config
-const StdOidcConfigURI = "/.well-known/openid-configuration"
-
 // OidcConfig returns config for host
 func OidcConfig(c echo.Context) error {
-
-	// baseUrl := c
-
-	hostURL := "http://" + c.Request().Host + strings.TrimSuffix(c.Request().URL.String(), StdOidcConfigURI)
-	oidc := oidc.Default()
-	oidc.JwksURI = hostURL + "/discovery/keys"
-	oidc.Issuer = hostURL
-	oidc.AuthorizationEndpoint = hostURL + "/oauth2/authorize"
+	oidc := openIDConfig{}
+	oidc.JwksURI = AuthServer + "/discovery/v2.0/keys"
+	oidc.Issuer = AuthServer + "/v2.0"
+	oidc.AuthorizationEndpoint = AuthServer + "/oauth2/v2.0/authorize"
+	oidc.TokenEndpoint = AuthServer + "/oauth2/v2.0/token"
 	return c.JSON(http.StatusOK, oidc)
+}
+
+type openIDConfig struct {
+	Issuer                string `json:"issuer"`
+	AuthorizationEndpoint string `json:"authorization_endpoint"`
+	TokenEndpoint         string `json:"token_endpoint"`
+	JwksURI               string `json:"jwks_uri"`
 }

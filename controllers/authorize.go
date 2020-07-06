@@ -1,34 +1,25 @@
 package controllers
 
 import (
+	"log"
 	"net/http"
 	"net/url"
 	"time"
 
-	"github.com/equinor/no-factor-auth/config"
-
 	jwt "github.com/dgrijalva/jwt-go"
-
 	"github.com/labstack/echo/v4"
 )
 
-type pair struct{
-	key string
-	values []string
-}
+var (
+	// AuthServer is the url where this server is hosted, including tenant
+	AuthServer string
+)
 
-func newTokenWithClaims(sub, iss, aud, nonce, name string, claims map[string]interface{}) (string, error) {
+func newToken(claims map[string]interface{}) (string, error) {
 	defaultClaims := jwt.MapClaims{
-		"sub":       sub,
-		"nbf":       time.Now().Unix(),
-		"iss":       iss,
-		"aud":       aud,
-		"nonce":     nonce,
-		"auth_time": time.Now().Unix(),
-		"acr":       "no-factor",
-		"iat":       time.Now().Unix(),
-		"exp":       time.Now().Add(1 * time.Hour).Unix(),
-		"name":      name,
+		"nbf": time.Now().Unix(),
+		"iat": time.Now().Unix(),
+		"exp": time.Now().Add(1 * time.Hour).Unix(),
 	}
 
 	for key, value := range claims {
@@ -43,49 +34,44 @@ func newTokenWithClaims(sub, iss, aud, nonce, name string, claims map[string]int
 		"kid": "1",
 	}
 
-	// Sign and get the complete encoded token as a string using the secret
-
-	tokenString, err := token.SignedString(config.PrivateKey())
+	tokenString, err := token.SignedString(privateKey())
 	if err != nil {
 		return "", err
 	}
 	return tokenString, nil
 }
 
-func newToken(sub, iss, aud, nonce, name string) (string, error){
-	var extraClaims map[string]interface{}
-	return newTokenWithClaims(sub, iss, aud, nonce, name, extraClaims)
+type signInReq struct {
+	ClientID     string `json:"client_id" query:"client_id"`
+	Tenant       string `json:"tenant" query:"tenant"`
+	ResponseType string `json:"response_type" query:"response_type"`
+	RedirectURI  string `json:"redirect_uri" query:"redirect_uri"`
+	State        string `json:"state" query:"state"`
 }
 
 // Authorize provides id_token and access_token to anyone who asks
 func Authorize(c echo.Context) error {
-	redirectURI := c.QueryParam("redirect_uri")
-	if redirectURI == "" {
-		redirectURI = "/"
-	}
-	clientID := c.QueryParam("client_id")
-	state := c.QueryParam("state")
-
-	sub := c.QueryParam("sub")
-	if len(sub) == 0 {
-		sub = "anon1"
+	r := new(signInReq)
+	err := c.Bind(r)
+	if err != nil {
+		return c.String(400, "bad")
 	}
 
-	user := c.QueryParam("user")
-	if len(user) == 0 {
-		user = "Jane Doe"
-	}
+	claims := make(map[string]interface{})
+	claims["iss"] = AuthServer + "/v2.0"
+	claims["aud"] = r.ClientID
+	claims["sub"] = r.ClientID
 
-	// Sign and get the complete encoded token as a string using the secret
-
-	tokenString, err := newToken(sub, c.Request().Host, clientID, c.QueryParam("nonce"), user)
+	tokenString, err := newToken(claims)
 	if err != nil {
 		return err
 	}
+
 	params := url.Values{}
 	params.Set("id_token", tokenString)
 	params.Set("access_token", tokenString)
-	params.Set("state", state)
+	params.Set("state", r.State)
+	log.Println(tokenString)
 
-	return c.Redirect(http.StatusFound, redirectURI+"#"+params.Encode())
+	return c.Redirect(http.StatusFound, r.RedirectURI+"#"+params.Encode())
 }

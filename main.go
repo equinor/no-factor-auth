@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -15,24 +16,9 @@ import (
 )
 
 var (
-	authServer string
-	tenantID   string
-	certPath   string
-)
-
-var (
 	Version = ""
 	v       = flag.Bool("version", false, "Display version")
 )
-
-func setup(e *echo.Echo) {
-
-	com := e.Group("/common")
-	com.GET("/.well-known/openid-configuration", controllers.OidcConfig)
-	com.GET("/discovery/keys", controllers.Jwks)
-	com.GET("/oauth2/authorize", controllers.Authorize)
-	com.GET("/oauth2/token", controllers.Token)
-}
 
 func version() {
 	fmt.Println("Version:", Version)
@@ -53,14 +39,27 @@ func main() {
 		log.Fatal("Error loading .env file", err)
 	}
 
-	authServer = os.Getenv("AUTHSERVER")
-	tenantID = os.Getenv("TENANT_ID")
+	var claims map[string]interface{}
+	rawClaims := os.Getenv("TOKEN_ENDPOINT_CLAIMS")
+	fmt.Println(rawClaims)
+	if len(rawClaims) > 0 {
+		err = json.Unmarshal([]byte(rawClaims), &claims)
+		if err != nil {
+			log.Fatalf(" %v", err)
+		}
+	}
+
+	controllers.AuthServer = os.Getenv("AUTH_SERVER")
 	e := echo.New()
 
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
-	setup(e)
+	e.GET("/common/v2.0/.well-known/openid-configuration", controllers.OidcConfig)
+	e.GET("/common/discovery/v2.0/keys", controllers.Jwks)
+	e.GET("/common/oauth2/v2.0/authorize", controllers.Authorize)
+	// ec := `{"aud":"https://storage.azure.com","iss":"https://sts.windows.net/common"}`
+	e.POST("/common/oauth2/v2.0/token", controllers.Token(claims))
 
 	e.Logger.Fatal(e.Start("0.0.0.0:8089"))
 }

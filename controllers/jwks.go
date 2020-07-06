@@ -5,21 +5,34 @@ import (
 	"math/big"
 	"net/http"
 
-	"github.com/equinor/no-factor-auth/config"
-	"github.com/equinor/no-factor-auth/oidc"
 	"github.com/labstack/echo/v4"
 )
 
-func rsaKeyset() (*oidc.JWKS, error) {
+type jwk struct {
+	Alg string `json:"alg,omitempty"`
+	Kty string `json:"kty,omitempty"`
+	Use string `json:"use,omitempty"`
+	Kid string `json:"kid,omitempty"`
+	X5T string `json:"x5t,omitempty"`
+	K   string `json:"k,omitempty"`
+	N   string `json:"n,omitempty"`
+	E   string `json:"e,omitempty"`
+}
 
-	pub := config.PublicKey()
+type jwks struct {
+	Keys []jwk `json:"keys"`
+}
+
+func rsaKeyset() (*jwks, error) {
+
+	pub := publicKey()
 	b64 := base64.RawURLEncoding.EncodeToString
 
 	e := big.Int{}
 	e.SetUint64(uint64(pub.E))
 
-	keys := oidc.JWKS{
-		Keys: []oidc.JWK{
+	keys := jwks{
+		Keys: []jwk{
 			{
 				Alg: "RS256",
 				Kty: "RSA",
@@ -32,16 +45,16 @@ func rsaKeyset() (*oidc.JWKS, error) {
 	return &keys, nil
 }
 
-func hmacKeyset() (*oidc.JWKS, error) {
+func hmacKeyset() (*jwks, error) {
 
-	keys := oidc.JWKS{
-		Keys: []oidc.JWK{
+	keys := jwks{
+		Keys: []jwk{
 			{
 				Alg: "HS256",
 				Kty: "oct",
 				Kid: "hmac",
 				Use: "sig",
-				K:   string(config.HMACKey()),
+				K:   string(hmacKey()),
 			}}}
 	return &keys, nil
 }
@@ -49,7 +62,7 @@ func hmacKeyset() (*oidc.JWKS, error) {
 // Jwks provides oidc keyset
 func Jwks(c echo.Context) error {
 
-	jwks, err := rsaKeyset()
+	keys, err := rsaKeyset()
 	if err != nil {
 		return err
 	}
@@ -58,6 +71,6 @@ func Jwks(c echo.Context) error {
 		return err
 	}
 
-	jwks.Keys = append(jwks.Keys, hmacJwks.Keys...)
-	return c.JSON(http.StatusOK, jwks)
+	keys.Keys = append(keys.Keys, hmacJwks.Keys...)
+	return c.JSON(http.StatusOK, keys)
 }

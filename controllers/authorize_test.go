@@ -7,8 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/equinor/no-factor-auth/config"
-
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
@@ -29,14 +27,13 @@ func TestAuthorized(t *testing.T) {
 	}
 
 	loc, err := rec.Result().Location()
-
 	if !assert.NoError(t, err) {
 		return
 	}
 
 	fragments := strings.Split(loc.Fragment, "&")
-	accessToken := ""
-	tokenPrefix := "id_token="
+	var accessToken string
+	tokenPrefix := "access_token="
 	for _, frag := range fragments {
 		if strings.HasPrefix(frag, tokenPrefix) {
 			accessToken = strings.TrimPrefix(frag, tokenPrefix)
@@ -44,12 +41,7 @@ func TestAuthorized(t *testing.T) {
 		}
 	}
 
-	if len(accessToken) == 0 {
-		t.Errorf("No access/idtoken token")
-		return
-	}
-
-	p := config.PublicKey()
+	p := publicKey()
 	t.Run("Check token", checktoken(accessToken, p))
 
 }
@@ -73,29 +65,9 @@ func checktoken(tokenString string, pubKey interface{}) func(t *testing.T) {
 			return
 		}
 
-		claims, ok := token.Claims.(jwt.MapClaims)
+		_, ok := token.Claims.(jwt.MapClaims)
+		assert.True(t, ok)
 
-		if !ok {
-
-			assert.Error(t, fmt.Errorf("No claims"), "No claims found")
-		}
-
-		l := len(claims)
-		if !assert.Equal(t, true, l > 0) {
-			return
-		}
-
-		v, ok := claims["sub"]
-		if !ok {
-
-			assert.Error(t, fmt.Errorf("No subject claim found"), "No subject claim found")
-		}
-		sub, ok := v.(string)
-		if !ok {
-
-			t.Errorf("Subject can't be parsed")
-		}
-		fmt.Println(sub)
 		return
 
 	}
